@@ -1,0 +1,50 @@
+# only to be used as a dev tool
+
+version: '3'
+
+services:
+
+  ufes-db1:
+    image: postgres:14
+    container_name: ufes-db1
+    restart: always
+    tty: true
+    volumes:
+      - ufes-db-volume:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_PASSWORD=${DB_PASS}
+      - POSTGRES_USER=${DB_USER}
+    networks:
+      - trident-net
+    ports:
+      - "5432:5432"
+
+  db1-app:
+    volumes:
+      - ./app:/app/
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ufes-db/app
+    container_name: db-app
+    entrypoint: dockerize -wait tcp://ufes-db1:5432 -timeout 40s uvicorn api:app --host 0.0.0.0 --port 8000 --reload
+    tty: true
+    networks:
+      - trident-net
+    ports:
+      - "8000:8000"
+    environment:
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_PASSWORD=${DB_PASS}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_HOST=ufes-db1
+      - POSTGRES_PORT=5432
+    depends_on:
+      - ufes-db1
+
+networks:
+  trident-net:
+    driver: bridge
+volumes:
+  ufes-db-volume:
