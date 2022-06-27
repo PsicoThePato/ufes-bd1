@@ -3,14 +3,20 @@ from abc import ABC, abstractmethod
 from config.settings import ApiDB
 
 
+query = str
+schema = str
+constraints = tuple
+select = bool
+
+
 class BaseWrapper(ABC):
     connection_params: ApiDB
 
     @abstractmethod
     def faz_query(
-        self, query: str, schema: str, constraints_tuple: tuple = None, select: bool = False
-    ) -> list[tuple]:
-        """abstract"""
+        self, transactions: list[tuple[query, schema, constraints, select]]
+    ) -> list[list[tuple]]:
+        """DO NOT change the function type"""
 
 
 # why is python's type system so incredibly shit?

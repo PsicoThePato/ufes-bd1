@@ -9,8 +9,8 @@ class PostgresWrapper(BaseWrapper):
         self.connection_params = connection_params
 
     def faz_query(
-        self, query: str, schema: str, constraints_tuple: tuple = None, select: bool = False
-    ) -> list[tuple]:
+        self, transactions: list[tuple[str, str, tuple, bool]], schema: str
+    ) -> list[list[tuple]]:
         """
         Recebe uma query e, opcionalmente, uma tupla de constraints
         e um parâmetro para retornar o resultado da query.
@@ -26,7 +26,8 @@ class PostgresWrapper(BaseWrapper):
                     None caso select seja falso, e as linhas selecionadas
                     pela query caso contrário
         """
-        lista_select = None
+
+        lista_select = []
         with psycopg2.connect(
             dbname=self.connection_params.db_name,
             user=self.connection_params.user,
@@ -36,13 +37,17 @@ class PostgresWrapper(BaseWrapper):
             options="-c search_path=" + schema,
         ) as conn:
             cur = conn.cursor()
-            print(f"Minha query é: {cur.mogrify(query)}")
-            if not constraints_tuple:
-                cur.execute(query)
-            else:
-                cur.execute(query, constraints_tuple)
-            if select:
-                lista_select = cur.fetchall()
+            for transaction in transactions:
+                query = transaction[0]
+                constraints_tuple = transaction[1]
+                select = transaction[2]
+                print(f"Minha query é: {cur.mogrify(query)}")
+                if not constraints_tuple:
+                    cur.execute(query)
+                else:
+                    cur.execute(query, constraints_tuple)
+                if select:
+                    lista_select.append(cur.fetchall())
             conn.commit()
             cur.close()
 
