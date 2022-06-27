@@ -1,3 +1,4 @@
-from .entidades import User, Transaction
+from .user import User
+from .transaction import Transaction
 
 MODELS = [User, Transaction]
