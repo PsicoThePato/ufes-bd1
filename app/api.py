@@ -1,17 +1,14 @@
 from decimal import Decimal
 from typing import Optional
+import json
 
-from fastapi import FastAPI, Request, Form, File, UploadFile, APIRouter, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+from fastapi import FastAPI, HTTPException
 from peewee import PostgresqlDatabase
 from pydantic import BaseModel
 
-
 from config import POSTGRES_DB
 from models import MODELS
-from models.user import UserController, Err
+from models.user import UserController, Err, UserModel
 from models.db.postgres import PostgresWrapper
 
 
@@ -60,13 +57,25 @@ def healthcheck():
 
 @app.post("/create-user")
 def create_user(user: User):
-    UserController(PostgresWrapper(POSTGRES_DB)).create_user(user)
+    """Cria um usuário no banco de dados"""
+    UserModel(UserController(PostgresWrapper(POSTGRES_DB))).create_user(user)
     return {"message": "User created!"}
 
 
 @app.post("/transaction")
 def transaction(trans: Transaction):
-    status = UserController(PostgresWrapper(POSTGRES_DB)).make_transaction(trans)
+    """Faz uma transação entre usuário não lojista e usuário no sistema"""
+    status = UserModel(UserController(PostgresWrapper(POSTGRES_DB))).make_transaction(trans)
     if isinstance(status, Err):
         raise HTTPException(status_code=status.err_status, detail=status.err_message)
     return {"message": "Sucess"}
+
+
+@app.get("/users/{cpf}")
+async def get_user(cpf: str):
+    """Retorna as informações de um usuário, buscando-o pelo seu cpf"""
+    user = UserModel(UserController(PostgresWrapper(POSTGRES_DB))).get_user(cpf)
+    if isinstance(user, Err):
+        raise HTTPException(status_code=user.err_status, detail=user.err_message)
+    user.content["balance"] = str(user.content["balance"])
+    return json.dumps(user.content)
