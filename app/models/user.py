@@ -132,7 +132,7 @@ class UserModel:
         return Success(user)
 
     def make_transaction(self, transaction):
-        payer = self._controller.get_user(transaction.payer)
+        payer = self._controller.get_user(self._mask_cpf({"cpf": transaction.payer})["cpf"])
         if isinstance(payer, Err):
             return payer
         print(payer.content)
