@@ -6,8 +6,6 @@ import re
 from peewee import CharField, BooleanField, DecimalField
 import requests
 
-from app.api import Transaction
-
 from .base import BaseModel
 from .db.base import BaseWrapper
 
@@ -62,7 +60,7 @@ class UserController:
             [
                 (
                     query,
-                    (self._mask_cpf({"cpf": user_cpf})["cpf"],),
+                    (user_cpf,),
                     True,
                 ),
             ],
@@ -84,7 +82,7 @@ class UserController:
             "balance": user[5],
         }
 
-    def update_users(self, payer: dict, payee: dict, transaction: Transaction):
+    def update_users(self, payer: dict, payee: dict, transaction):
         # TODO generalizar a função pra dar update em qualquer número de users atomicamente
         query = r"""UPDATE public.user set balance = %s WHERE cpf=%s"""
         constraints_payer = (payer["balance"] - transaction.value, payer["cpf"])
@@ -118,6 +116,7 @@ class UserModel:
         return user
 
     def _mask_cpf(self, user: dict):
+        # TODO change this shit to also accept a string
         user["cpf"] = "".join([s for s in user["cpf"] if s.isdigit()])
         return user
 
@@ -132,7 +131,7 @@ class UserModel:
 
         return Success(user)
 
-    def make_transaction(self, transaction: Transaction):
+    def make_transaction(self, transaction):
         payer = self._controller.get_user(transaction.payer)
         if isinstance(payer, Err):
             return payer
@@ -143,7 +142,7 @@ class UserModel:
         if payer["balance"] < transaction.value:
             return Err(f"Usuário {payer['cpf']} não tem saldo o suficiente", 401)
 
-        payee = self._controller.get_user(transaction.payee)
+        payee = self._controller.get_user(self._mask_cpf({"cpf": transaction.payee})["cpf"])
         if isinstance(payee, Err):
             return payee
         payee = payee.content
@@ -152,7 +151,13 @@ class UserModel:
         if is_authorized.status_code < 200 or is_authorized.status_code >= 300:
             return Err("Transação não autorizada", is_authorized.status_code)
 
+        self._controller.update_users(payer, payee, transaction)
         send_sms = requests.post(SMS_MOCK)
         if send_sms.status_code < 200 or send_sms.status_code >= 300:
             return Err("Falha no envio do sms", send_sms.status_code)
         return Success(None)
+
+    def get_user(self, user_cpf: str):
+        cpf = self._mask_cpf({"cpf": user_cpf})["cpf"]
+        user = self._controller.get_user(cpf)
+        return user
